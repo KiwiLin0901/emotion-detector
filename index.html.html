@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 情緒偵測器</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.7.4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.4/dist/teachablemachine-image.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            text-align: center;
+            width: 90%;
+            max-width: 500px;
+        }
+        #webcam-container {
+            margin: 20px 0;
+            border-radius: 15px;
+            overflow: hidden;
+            border: 5px solid #eef0f2;
+        }
+        #emoji-display {
+            font-size: 80px;
+            margin: 20px 0;
+            height: 100px;
+        }
+        .label-box {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>AI 情緒偵測器</h2>
+    <p>模型標籤：Happy, Sad, Angry</p>
+    
+    <button type="button" id="start-btn" onclick="init()">啟動鏡頭</button>
+    
+    <div id="webcam-container"></div>
+    
+    <div id="emoji-display">🤖</div>
+    
+    <div id="label-container"></div>
+</div>
+
+<script type="text/javascript">
+    // 注意：如果是 GitHub Pages，請確保路徑正確
+    const URL = "./my_model/";
+
+    let model, webcam, labelContainer, maxPredictions;
+    const emojiMap = {
+        "Happy": "😊",
+        "Sad": "😢",
+        "Angry": "😠"
+    };
+
+    async function init() {
+        document.getElementById("start-btn").style.display = "none";
+        
+        const modelURL = URL + "model.json";
+        const metadataURL = URL + "metadata.json";
+
+        // 載入模型
+        model = await tmImage.load(modelURL, metadataURL);
+        maxPredictions = model.getTotalClasses();
+
+        // 設定攝影機
+        const flip = true; 
+        webcam = new tmImage.Webcam(350, 350, flip); 
+        await webcam.setup(); 
+        await webcam.play();
+        window.requestAnimationFrame(loop);
+
+        document.getElementById("webcam-container").appendChild(webcam.canvas);
+        labelContainer = document.getElementById("label-container");
+        for (let i = 0; i < maxPredictions; i++) {
+            labelContainer.appendChild(document.createElement("div"));
+        }
+    }
+
+    async function loop() {
+        webcam.update(); 
+        await predict();
+        window.requestAnimationFrame(loop);
+    }
+
+    async function predict() {
+        const prediction = await model.predict(webcam.canvas);
+        
+        // 找出機率最高的那一個
+        let highestProb = 0;
+        let bestLabel = "";
+
+        for (let i = 0; i < maxPredictions; i++) {
+            const classPrediction = prediction[i].className;
+            const prob = prediction[i].probability;
+            
+            // 更新進度條或數值文字
+            labelContainer.childNodes[i].innerHTML = `
+                <div class="label-box">
+                    <span>${classPrediction}</span>
+                    <span>${(prob * 100).toFixed(0)}%</span>
+                </div>`;
+
+            if (prob > highestProb) {
+                highestProb = prob;
+                bestLabel = classPrediction;
+            }
+        }
+
+        // 更新大 Emoji
+        if (highestProb > 0.5) {
+            document.getElementById("emoji-display").innerHTML = emojiMap[bestLabel] || "❓";
+        }
+    }
+</script>
+
+</body>
+</html>
